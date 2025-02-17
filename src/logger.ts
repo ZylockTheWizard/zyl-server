@@ -2,11 +2,15 @@ import fs from 'node:fs'
 
 export class Logger
 {
-    static logFile = 'logs/out.log'
-    static errorFile = 'logs/error.log'
+    static logFolder = 'logs'
+    static logFile = this.logFolder + '/out.log'
+    static errorFile = this.logFolder + + '/error.log'
 
     static 
     {
+        if (!fs.existsSync(this.logFolder)) {
+            fs.mkdirSync(this.logFolder)
+        }
         process.on('uncaughtExceptionMonitor', err => {
             this.error(JSON.stringify(err, Object.getOwnPropertyNames(err)))
         })
