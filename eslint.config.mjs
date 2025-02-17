@@ -18,9 +18,21 @@ export default [
     {
         rules: {
             '@typescript-eslint/no-explicit-any': 'off',
+            '@typescript-eslint/no-unused-vars': [
+                'error',
+                {
+                    'args': 'all',
+                    'argsIgnorePattern': '^_',
+                    'caughtErrors': 'all',
+                    'caughtErrorsIgnorePattern': '^_',
+                    'destructuredArrayIgnorePattern': '^_',
+                    'varsIgnorePattern': '^_',
+                    'ignoreRestSiblings': true
+                }
+            ],
             '@stylistic/indent': ['error', 4],
             '@stylistic/semi': ['error', 'never'],
-            '@stylistic/max-len': ['error', { 'code': 100 }],
+            '@stylistic/max-len': ['error', { 'code': 150 }],
             '@stylistic/quotes': ['error', 'single']
         }
     }
