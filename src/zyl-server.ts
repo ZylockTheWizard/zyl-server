@@ -14,7 +14,7 @@ export class ZylServer
     
         const onQuery = (query: string, callback: (val: any) => void) => {
             Logger.log({socket: socket.id, query})
-            if(!this.databaseSocket) {
+            if(!this.databaseSocket || this.databaseSocket.disconnected) {
                 const message = 'Server Error: database is not connected'
                 Logger.error(message)
                 callback({error: message})
