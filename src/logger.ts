@@ -4,7 +4,7 @@ export class Logger
 {
     static logFolder = 'logs'
     static logFile = this.logFolder + '/out.log'
-    static errorFile = this.logFolder + + '/error.log'
+    static errorFile = this.logFolder + '/error.log'
 
     static 
     {
