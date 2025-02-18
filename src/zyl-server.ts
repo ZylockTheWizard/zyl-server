@@ -8,6 +8,10 @@ export class ZylServer
     static databaseSocket: S
 
     static registerSocketEvents = (socket: S) => {
+        const onPing = (callback: (val: any) => void) => {
+            callback('pong')
+        }
+
         const onDisconnect = () => {
             Logger.log('Client Disconnected: ' + socket.id)
         }
@@ -24,6 +28,7 @@ export class ZylServer
             }
         }
 
+        socket.on('ping', onPing)
         socket.on('disconnect', onDisconnect)
         socket.on('query', onQuery)
     }
