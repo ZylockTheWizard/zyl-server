@@ -8,25 +8,22 @@ import { Database } from './database'
 
 type S = Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>
 
-class ZylSocket
-{
+class ZylSocket {
     onDisconnect = () => {
         Logger.log('Client Disconnected: ' + this.socket.id)
     }
 
-    onQuery = async(query: string, callback: (val: any) => void) => {
+    onQuery = async (query: string, callback: (val: any) => void) => {
         callback(await Database.query(query))
     }
 
-    constructor(private socket: S)
-    {
+    constructor(private socket: S) {
         this.socket.on('disconnect', this.onDisconnect)
         this.socket.on('query', this.onQuery)
     }
 }
 
-export class ZylServer
-{
+export class ZylServer {
     private static app: Express
 
     private static rl = readline.createInterface({
@@ -39,12 +36,11 @@ export class ZylServer
         new ZylSocket(socket)
     }
 
-    public static start()
-    {
+    public static start() {
         const port = 3001
 
         Database.connect()
-        
+
         this.app = express()
         this.app.use(cors())
         const httpServer = createServer(this.app)
@@ -55,8 +51,11 @@ export class ZylServer
         this.app.get('/', (_req, res) => {
             res.send('<h1>Hello from the server!</h1>')
         })
+
         httpServer.listen(port, () => {
-            this.rl.question(`Running server on PORT ${port}...\n`, () => process.exit())
+            this.rl.question(`Running server on PORT ${port}...\n`, () =>
+                process.exit(),
+            )
         })
     }
 }

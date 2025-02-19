@@ -1,30 +1,28 @@
 import mysql from 'mysql'
 import { Logger } from './logger'
 
-
-export class Database
-{
+export class Database {
     static connection: mysql.Connection
-    
-    static connect()
-    {
+
+    static connect() {
         const config: mysql.ConnectionConfig = {
             user: 'root',
             database: 'zyl',
             host: 'localhost',
-            password: 'lolipop0-A'
+            password: 'lolipop0-A',
         }
         this.connection = mysql.createConnection(config)
-        this.connection.connect((err) => {if (err) throw err})
+        this.connection.connect((err) => {
+            if (err) throw err
+        })
     }
 
-    static query(q: string)
-    {
-        Logger.log({query: q})
+    static query(q: string) {
+        Logger.log({ query: q })
         const resolveQuery = (resolve: (value: any) => void) => {
             const onComplete: mysql.queryCallback = (err, result) => {
                 if (err) throw err
-                Logger.log({result})
+                Logger.log({ result })
                 resolve(result)
             }
             this.connection.query(q, onComplete)
