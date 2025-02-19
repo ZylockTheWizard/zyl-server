@@ -1,60 +1,62 @@
+import readline from 'node:readline'
+import { createServer } from 'node:http'
+import express, { Express } from 'express'
+import cors from 'cors'
 import { DefaultEventsMap, Server, Socket } from 'socket.io'
 import { Logger } from './logger'
+import { Database } from './database'
 
 type S = Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>
 
+class ZylSocket
+{
+    onDisconnect = () => {
+        Logger.log('Client Disconnected: ' + this.socket.id)
+    }
+
+    onQuery = async(query: string, callback: (val: any) => void) => {
+        callback(await Database.query(query))
+    }
+
+    constructor(private socket: S)
+    {
+        this.socket.on('disconnect', this.onDisconnect)
+        this.socket.on('query', this.onQuery)
+    }
+}
+
 export class ZylServer
 {
-    static databaseSocket: S
+    private static app: Express
 
-    static registerSocketEvents = (socket: S) => {
-        const onPing = (callback: (val: any) => void) => {
-            callback('pong')
-        }
-
-        const onDisconnect = () => {
-            Logger.log('Client Disconnected: ' + socket.id)
-        }
-    
-        const onQuery = (query: string, callback: (val: any) => void) => {
-            Logger.log({socket: socket.id, query})
-            if(!this.databaseSocket || this.databaseSocket.disconnected) {
-                const message = 'Server Error: database is not connected'
-                Logger.error(message)
-                callback({error: message})
-            } 
-            else {
-                this.databaseSocket?.emit('query', query, (val: any) => callback(val))
-            }
-        }
-
-        socket.on('ping', onPing)
-        socket.on('disconnect', onDisconnect)
-        socket.on('query', onQuery)
-    }
+    private static rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+    })
 
     static onConnection = (socket: S) => {
         Logger.log('Client Connected: ' + socket.id)
-        if(socket.handshake.query.database) {
-            const database = socket.handshake.query.database
-            if(database !== 'CyberPow230915') {
-                Logger.log('Database computer name is invalid: ' + database)
-                socket.disconnect()
-            }
-            else {
-                this.databaseSocket = socket
-                Logger.log('Database Registered: ' + this.databaseSocket.id)
-            }
-        }
-        this.registerSocketEvents(socket)
+        new ZylSocket(socket)
     }
 
     public static start()
     {
         const port = 3001
-        const server = new Server({cors: {origin: '*'}})
-        server.on('connection', this.onConnection)
-        server.listen(port)
-        Logger.log('Listening on port: ' + port)
+
+        Database.connect()
+        
+        this.app = express()
+        this.app.use(cors())
+        const httpServer = createServer(this.app)
+        const ioServer = new Server(httpServer)
+
+        ioServer.on('connection', this.onConnection)
+        this.app.use('/images', express.static('images'))
+        this.app.get('/', (_req, res) => {
+            res.send('<h1>Hello from the server!</h1>')
+        })
+        httpServer.listen(port, () => {
+            this.rl.question(`Running server on PORT ${port}...\n`, () => process.exit())
+        })
     }
 }
