@@ -1,6 +1,6 @@
 import readline from 'node:readline'
 import { createServer } from 'node:http'
-import express, { Express } from 'express'
+import express from 'express'
 import cors from 'cors'
 import { DefaultEventsMap, Server, Socket } from 'socket.io'
 import { Logger } from './logger'
@@ -8,32 +8,27 @@ import { Database } from './database'
 
 type S = Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>
 
-class ZylSocket {
-    onDisconnect = () => {
-        Logger.log('Client Disconnected: ' + this.socket.id)
-    }
-
-    onQuery = async (query: string, callback: (val: any) => void) => {
-        callback(await Database.query(query))
-    }
-
-    constructor(private socket: S) {
-        this.socket.on('disconnect', this.onDisconnect)
-        this.socket.on('query', this.onQuery)
-    }
-}
-
 export class ZylServer {
-    private static app: Express
+    static sockets: S[] = []
 
-    private static rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-    })
+    static socketDisconnect = (socket: S) => {
+        return () => {
+            Logger.log('Client Disconnected: ' + socket.id)
+        }
+    }
+
+    static socketQuery = (socket: S) => {
+        return async (query: string, callback: (val: any) => void) => {
+            Logger.log('Client Query: ' + socket.id)
+            callback(await Database.query(query))
+        }
+    }
 
     static onConnection = (socket: S) => {
         Logger.log('Client Connected: ' + socket.id)
-        new ZylSocket(socket)
+        socket.on('disconnect', this.socketDisconnect(socket))
+        socket.on('query', this.socketQuery(socket))
+        this.sockets.push(socket)
     }
 
     public static start() {
@@ -41,21 +36,24 @@ export class ZylServer {
 
         Database.connect()
 
-        this.app = express()
-        this.app.use(cors())
-        const httpServer = createServer(this.app)
+        const app = express()
+        app.use(cors())
+        const httpServer = createServer(app)
         const ioServer = new Server(httpServer)
 
         ioServer.on('connection', this.onConnection)
-        this.app.use('/images', express.static('images'))
-        this.app.get('/', (_req, res) => {
+        app.use('/images', express.static('images'))
+        app.get('/', (_req, res) => {
             res.send('<h1>Hello from the server!</h1>')
         })
 
+        const consoleInterface = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+        })
+
         httpServer.listen(port, () => {
-            this.rl.question(`Running server on PORT ${port}...\n`, () =>
-                process.exit(),
-            )
+            consoleInterface.question(`Running server on port ${port}...\n`, () => process.exit())
         })
     }
 }
