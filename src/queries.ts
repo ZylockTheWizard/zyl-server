@@ -14,3 +14,12 @@ export const passwordResetQuery = (id: string, password: string) => {
         WHERE id = '${id}'
     `
 }
+
+export const messagesQuery = () => 'SELECT * FROM messages'
+
+export const insertMessageQuery = (user: string, message: string) => {
+    return `
+        INSERT INTO messages (userId, message)
+        VALUES ('${user}', '${message}')
+    `
+}

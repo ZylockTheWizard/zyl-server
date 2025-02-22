@@ -13,9 +13,7 @@ export class Database {
         }
         this.connection = mysql.createConnection(config)
         this.connection.connect((err) => {
-            if (err) {
-                Logger.error('Failed to connect to the database', err)
-            }
+            if (err) Logger.error('Failed to connect to the database', err)
         })
     }
 

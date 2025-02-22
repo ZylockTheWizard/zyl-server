@@ -5,7 +5,7 @@ import cors from 'cors'
 import { DefaultEventsMap, Server, Socket } from 'socket.io'
 import { Logger } from './logger'
 import { Database } from './database'
-import { passwordResetQuery, userQuery } from './queries'
+import { insertMessageQuery, messagesQuery, passwordResetQuery, userQuery } from './queries'
 
 type S = Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>
 
@@ -17,13 +17,13 @@ type ZylSocket = {
 export class ZylServer {
     static ioServer: Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>
     static sockets: ZylSocket[] = []
-    static zyleRoom = 'zyle-room'
+    static zyleRoom = 'zyl-room'
 
     static socketDisconnect = (socket: S) => {
         return () => {
             Logger.log('Client Disconnected: ' + socket.id)
             socket.leave(this.zyleRoom)
-            this.sockets = this.sockets.filter((s) => s.socket.id === socket.id)
+            this.sockets = this.sockets.filter((s) => s.socket.id !== socket.id)
             this.broadcastCurrentUsers()
         }
     }
@@ -43,6 +43,10 @@ export class ZylServer {
         this.ioServer.to(this.zyleRoom).emit('connected-users', this.currentUsers())
     }
 
+    static currentMessages = async () => {
+        return { messages: await Database.query(messagesQuery()) }
+    }
+
     static socketLogin = (socket: S) => {
         return async (user: string, password: string, callback: (val: any) => void) => {
             let result: any
@@ -55,7 +59,6 @@ export class ZylServer {
                 else if (dbUser[0].password !== password) error = 'Incorrect password'
                 else {
                     const existingUser = this.sockets.find((s) => s.user?.toLowerCase() === user.toLowerCase())
-                    console.log(existingUser?.socket.id)
                     if (existingUser && existingUser.socket.id !== socket.id) error = 'User already logged in'
                     else if (dbUser[0].passwordReset === 1) result = { passwordReset: true }
                     else {
@@ -63,7 +66,7 @@ export class ZylServer {
                         userSocket.user = user
                         this.broadcastCurrentUsers()
                         userSocket.socket.join(this.zyleRoom)
-                        result = this.currentUsers()
+                        result = { ...this.currentUsers(), ...(await this.currentMessages()) }
                     }
                 }
             }
@@ -80,12 +83,29 @@ export class ZylServer {
         }
     }
 
+    static getUser = (id: string) => {
+        return this.sockets.find((s) => s.socket.id === id).user
+    }
+
+    static broadcastMessages = async () => {
+        this.ioServer.to(this.zyleRoom).emit('current-messages', await this.currentMessages())
+    }
+
+    static socketMessage = (socket: S) => {
+        return async (message: string) => {
+            const user = this.getUser(socket.id)
+            await Database.query(insertMessageQuery(user, message))
+            await this.broadcastMessages()
+        }
+    }
+
     static onConnection = (socket: S) => {
         Logger.log('Client Connected: ' + socket.id)
         socket.on('disconnect', this.socketDisconnect(socket))
         socket.on('query', this.socketQuery(socket))
         socket.on('login', this.socketLogin(socket))
         socket.on('password-reset', this.socketPasswordReset(socket))
+        socket.on('message', this.socketMessage(socket))
         this.sockets.push({ socket })
     }
 
