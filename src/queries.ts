@@ -1,8 +1,7 @@
-export const userQuery = (id: string) => {
-    return `
-        SELECT * FROM users
-        WHERE id = '${id}'
-    `
+export const userQuery = (id?: string) => {
+    let query = 'SELECT * FROM users'
+    if (id) query += ` WHERE id = '${id}'`
+    return query
 }
 
 export const passwordResetQuery = (id: string, password: string) => {
@@ -21,5 +20,12 @@ export const insertMessageQuery = (user: string, message: string) => {
     return `
         INSERT INTO messages (userId, message)
         VALUES ('${user}', '${message}')
+    `
+}
+
+export const createUserQuery = (id: string) => {
+    return `
+        INSERT INTO users (id, password, passwordReset)
+        VALUES ('${id}', UUID(), 1)
     `
 }

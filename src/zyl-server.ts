@@ -5,7 +5,13 @@ import cors from 'cors'
 import { DefaultEventsMap, Server, Socket } from 'socket.io'
 import { Logger } from './logger'
 import { Database } from './database'
-import { insertMessageQuery, messagesQuery, passwordResetQuery, userQuery } from './queries'
+import {
+    createUserQuery,
+    insertMessageQuery,
+    messagesQuery,
+    passwordResetQuery,
+    userQuery,
+} from './queries'
 
 type S = Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>
 
@@ -35,12 +41,23 @@ export class ZylServer {
         }
     }
 
-    static currentUsers = () => {
-        return { users: this.sockets.filter((s) => s.user).map((s) => s.user) }
+    static existingUser = (user: string) => {
+        return this.sockets.find((s) => s.user?.toLowerCase() === user.toLowerCase())
     }
 
-    static broadcastCurrentUsers = () => {
-        this.ioServer.to(this.zyleRoom).emit('connected-users', this.currentUsers())
+    static currentUsers = async () => {
+        const allUsers = await Database.query(userQuery())
+        const users = allUsers.map((u: any) => {
+            const existingUser = this.existingUser(u.id)
+            return { ...u, connected: !!existingUser }
+        })
+        users.sort((a: any, b: any) => a.id.localeCompare(b.id))
+        users.sort((a: any, b: any) => (a.connected === b.connected ? 0 : a.connected ? -1 : 1))
+        return { users }
+    }
+
+    static broadcastCurrentUsers = async () => {
+        this.ioServer.to(this.zyleRoom).emit('current-users', await this.currentUsers())
     }
 
     static currentMessages = async () => {
@@ -58,15 +75,19 @@ export class ZylServer {
                 else if (dbUser.length === 0) error = 'User not found'
                 else if (dbUser[0].password !== password) error = 'Incorrect password'
                 else {
-                    const existingUser = this.sockets.find((s) => s.user?.toLowerCase() === user.toLowerCase())
-                    if (existingUser && existingUser.socket.id !== socket.id) error = 'User already logged in'
+                    const existingUser = this.existingUser(user)
+                    if (existingUser && existingUser.socket.id !== socket.id)
+                        error = 'User already logged in'
                     else if (dbUser[0].passwordReset === 1) result = { passwordReset: true }
                     else {
                         const userSocket = this.sockets.find((s) => s.socket.id === socket.id)
                         userSocket.user = user
-                        this.broadcastCurrentUsers()
+                        await this.broadcastCurrentUsers()
                         userSocket.socket.join(this.zyleRoom)
-                        result = { ...this.currentUsers(), ...(await this.currentMessages()) }
+                        result = {
+                            ...(await this.currentUsers()),
+                            ...(await this.currentMessages()),
+                        }
                     }
                 }
             }
@@ -99,13 +120,31 @@ export class ZylServer {
         }
     }
 
+    static socketUserSave = (_socket: S) => {
+        return async (id: string, callback: (val: any) => void) => {
+            let error = ''
+            if (!id) error = 'Input is empty'
+            else {
+                const existingUser = await Database.query(userQuery(id))
+                if (existingUser?.length > 0) error = 'User ID already exists'
+                else {
+                    await Database.query(createUserQuery(id))
+                    await this.broadcastCurrentUsers()
+                }
+            }
+            callback({ error })
+        }
+    }
+
     static onConnection = (socket: S) => {
         Logger.log('Client Connected: ' + socket.id)
         socket.on('disconnect', this.socketDisconnect(socket))
         socket.on('query', this.socketQuery(socket))
         socket.on('login', this.socketLogin(socket))
         socket.on('password-reset', this.socketPasswordReset(socket))
+        socket.on('logout', () => socket.disconnect())
         socket.on('message', this.socketMessage(socket))
+        socket.on('user-save', this.socketUserSave(socket))
         this.sockets.push({ socket })
     }
 

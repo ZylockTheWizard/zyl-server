@@ -15,15 +15,12 @@ export class Logger {
     }
 
     private static standardize(message: string | object) {
-        const output =
-            typeof message === 'object' ? JSON.stringify(message) : message
+        const output = typeof message === 'object' ? JSON.stringify(message) : message
         return new Date().toISOString() + ' - ' + output
     }
 
     private static standardizeError(err: Error) {
-        return this.standardize(
-            JSON.stringify(err, Object.getOwnPropertyNames(err)),
-        )
+        return this.standardize(JSON.stringify(err, Object.getOwnPropertyNames(err)))
     }
 
     private static writeLine(file: string, line: string) {
