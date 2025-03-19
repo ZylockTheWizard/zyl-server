@@ -13,6 +13,9 @@ import {
     userQuery,
 } from './queries'
 
+const areEqual = (a: string | undefined, b: string | undefined) =>
+    a?.toLowerCase() === b?.toLowerCase()
+
 type S = Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>
 
 type ZylSocket = {
@@ -42,7 +45,7 @@ export class ZylServer {
     }
 
     static existingUser = (user: string) => {
-        return this.sockets.find((s) => s.user?.toLowerCase() === user.toLowerCase())
+        return this.sockets.find((s) => areEqual(s.user, user))
     }
 
     static currentUsers = async () => {
