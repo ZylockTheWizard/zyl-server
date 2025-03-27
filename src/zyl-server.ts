@@ -6,10 +6,10 @@ import { DefaultEventsMap, Server, Socket } from 'socket.io'
 import { Logger } from './logger'
 import { Database } from './database'
 import {
+    createSceneQuery,
     createUserQuery,
-    insertMessageQuery,
-    messagesQuery,
     passwordResetQuery,
+    sceneQuery,
     userQuery,
 } from './queries'
 
@@ -51,8 +51,9 @@ export class ZylServer {
     static currentUsers = async () => {
         const allUsers = await Database.query(userQuery())
         const users = allUsers.map((u: any) => {
+            const { password, ...rest } = u
             const existingUser = this.existingUser(u.id)
-            return { ...u, connected: !!existingUser }
+            return { ...rest, connected: !!existingUser }
         })
         users.sort((a: any, b: any) => a.id.localeCompare(b.id))
         users.sort((a: any, b: any) => (a.connected === b.connected ? 0 : a.connected ? -1 : 1))
@@ -63,8 +64,8 @@ export class ZylServer {
         this.ioServer.to(this.zyleRoom).emit('current-users', await this.currentUsers())
     }
 
-    static currentMessages = async () => {
-        return { messages: await Database.query(messagesQuery()) }
+    static currentScenes = async () => {
+        return { scenes: await Database.query(sceneQuery()) }
     }
 
     static socketLogin = (socket: S) => {
@@ -87,9 +88,10 @@ export class ZylServer {
                         userSocket.user = user
                         await this.broadcastCurrentUsers()
                         userSocket.socket.join(this.zyleRoom)
+                        const scenes = dbUser[0].master === 1 ? await this.currentScenes() : {}
                         result = {
                             ...(await this.currentUsers()),
-                            ...(await this.currentMessages()),
+                            ...scenes,
                         }
                     }
                 }
@@ -111,18 +113,6 @@ export class ZylServer {
         return this.sockets.find((s) => s.socket.id === id).user
     }
 
-    static broadcastMessages = async () => {
-        this.ioServer.to(this.zyleRoom).emit('current-messages', await this.currentMessages())
-    }
-
-    static socketMessage = (socket: S) => {
-        return async (message: string) => {
-            const user = this.getUser(socket.id)
-            await Database.query(insertMessageQuery(user, message))
-            await this.broadcastMessages()
-        }
-    }
-
     static socketUserSave = (_socket: S) => {
         return async (id: string, callback: (val: any) => void) => {
             let error = ''
@@ -139,6 +129,23 @@ export class ZylServer {
         }
     }
 
+    static socketSceneSave = (_socket: S) => {
+        return async (name: string, data: string, callback: (val: any) => void) => {
+            let error = ''
+            let result = {}
+            if (!name || !data) error = 'Input is empty'
+            else {
+                const existingScene = await Database.query(sceneQuery({ name }))
+                if (existingScene?.length > 0) error = 'Scene name already exists'
+                else {
+                    await Database.query(createSceneQuery(name, data))
+                    result = await this.currentScenes()
+                }
+            }
+            callback({ result, error })
+        }
+    }
+
     static onConnection = (socket: S) => {
         Logger.log('Client Connected: ' + socket.id)
         socket.on('disconnect', this.socketDisconnect(socket))
@@ -146,8 +153,8 @@ export class ZylServer {
         socket.on('login', this.socketLogin(socket))
         socket.on('password-reset', this.socketPasswordReset(socket))
         socket.on('logout', () => socket.disconnect())
-        socket.on('message', this.socketMessage(socket))
         socket.on('user-save', this.socketUserSave(socket))
+        socket.on('scene-save', this.socketSceneSave(socket))
         this.sockets.push({ socket })
     }
 
