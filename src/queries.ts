@@ -1,12 +1,17 @@
 const str = (val: string) => `'${val}'`
-
-type KeyString = {
-    [key: string]: string
-}
+type KeyString = { [key: string]: string }
 const keyStr = (obj: KeyString) => {
     const key = Object.keys(obj)[0]
     const val = Object.values(obj)[0]
     return `${key} = ${str(val)}`
+}
+
+const int = (val: string | number) => val.toString()
+type KeyInt = { [key: string]: string | number }
+const keyInt = (obj: KeyInt) => {
+    const key = Object.keys(obj)[0]
+    const val = Object.values(obj)[0]
+    return `${key} = ${int(val)}`
 }
 
 export const userQuery = (id?: string) => {
@@ -32,10 +37,11 @@ export const createUserQuery = (id: string) => {
     `
 }
 
-export const sceneQuery = (props?: { id?: string; name?: string }) => {
-    let query = 'SELECT id, name FROM scenes'
-    if (props) {
-        const { id, name } = props
+export const sceneQuery = (select?: string[], where?: { id?: string; name?: string }) => {
+    const selectClause = 'SELECT ' + (select?.length > 0 ? select.join() : '*')
+    let query = selectClause + ' FROM scenes'
+    if (where) {
+        const { id, name } = where
         if (id || name) {
             query += ' WHERE '
             const idClause = id ? keyStr({ id }) : undefined
@@ -51,5 +57,13 @@ export const createSceneQuery = (name: string, data: string) => {
     return `
         INSERT INTO scenes (name, data)
         VALUES (${str(name)}, ${str(data)})
+    `
+}
+
+export const setCurrentSceneQuery = (sceneId: string, user: string) => {
+    return `
+        UPDATE users
+        SET ${keyInt({ sceneId })}
+        WHERE ${keyStr({ id: user })}
     `
 }
