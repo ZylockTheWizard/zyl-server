@@ -2,7 +2,7 @@ import readline from 'node:readline'
 import { createServer } from 'node:http'
 import express from 'express'
 import cors from 'cors'
-import { DefaultEventsMap, Server, Socket } from 'socket.io'
+import { Server } from 'socket.io'
 import { Logger } from './logger'
 import { Database } from './database'
 import {
@@ -13,23 +13,19 @@ import {
     setCurrentSceneQuery,
     userQuery,
 } from './queries'
-
-const areEqual = (a: string | undefined, b: string | undefined) =>
-    a?.toLowerCase() === b?.toLowerCase()
-
-type S = Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>
+import { areEqual, ServerDefault, SocketDefault } from './globals'
 
 type ZylSocket = {
-    socket: S
     user?: string
+    socket: SocketDefault
 }
 
 export class ZylServer {
-    static ioServer: Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>
-    static sockets: ZylSocket[] = []
     static zyleRoom = 'zyl-room'
+    static ioServer: ServerDefault
+    static sockets: ZylSocket[] = []
 
-    static socketDisconnect = (socket: S) => {
+    static socketDisconnect = (socket: SocketDefault) => {
         return () => {
             Logger.log('Client Disconnected: ' + socket.id)
             socket.leave(this.zyleRoom)
@@ -38,7 +34,7 @@ export class ZylServer {
         }
     }
 
-    static socketQuery = (socket: S) => {
+    static socketQuery = (socket: SocketDefault) => {
         return async (query: string, callback: (val: any) => void) => {
             Logger.log('Client Query: ' + socket.id)
             callback(await Database.query(query))
@@ -69,7 +65,7 @@ export class ZylServer {
         return { scenes: await Database.query(sceneQuery(['id', 'name'])) }
     }
 
-    static socketLogin = (socket: S) => {
+    static socketLogin = (socket: SocketDefault) => {
         return async (user: string, password: string, callback: (val: any) => void) => {
             let result: any
             let error = ''
@@ -107,7 +103,7 @@ export class ZylServer {
         }
     }
 
-    static socketPasswordReset = (_socket: S) => {
+    static socketPasswordReset = (_socket: SocketDefault) => {
         return async (user: string, password: string, callback: (val: any) => void) => {
             let error = ''
             if (!user || !password) error = 'Inputs are empty'
@@ -120,7 +116,7 @@ export class ZylServer {
         return this.sockets.find((s) => s.socket.id === id).user
     }
 
-    static socketUserSave = (_socket: S) => {
+    static socketUserSave = (_socket: SocketDefault) => {
         return async (id: string, callback: (val: any) => void) => {
             let error = ''
             if (!id) error = 'Input is empty'
@@ -136,7 +132,7 @@ export class ZylServer {
         }
     }
 
-    static socketSceneSave = (_socket: S) => {
+    static socketSceneSave = (_socket: SocketDefault) => {
         return async (name: string, data: string, callback: (val: any) => void) => {
             let error = ''
             let result = {}
@@ -153,7 +149,7 @@ export class ZylServer {
         }
     }
 
-    static socketSetCurrentScene = (socket: S) => {
+    static socketSetCurrentScene = (socket: SocketDefault) => {
         return async (sceneId: string, user: string) => {
             await Database.query(setCurrentSceneQuery(sceneId, user))
             const result = await Database.query(sceneQuery(['data'], { id: sceneId }))
@@ -161,7 +157,7 @@ export class ZylServer {
         }
     }
 
-    static onConnection = (socket: S) => {
+    static onConnection = (socket: SocketDefault) => {
         Logger.log('Client Connected: ' + socket.id)
         socket.on('disconnect', this.socketDisconnect(socket))
         socket.on('query', this.socketQuery(socket))

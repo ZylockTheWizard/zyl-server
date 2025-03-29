@@ -1,69 +1,47 @@
-const str = (val: string) => `'${val}'`
-type KeyString = { [key: string]: string }
-const keyStr = (obj: KeyString) => {
-    const key = Object.keys(obj)[0]
-    const val = Object.values(obj)[0]
-    return `${key} = ${str(val)}`
-}
-
-const int = (val: string | number) => val.toString()
-type KeyInt = { [key: string]: string | number }
-const keyInt = (obj: KeyInt) => {
-    const key = Object.keys(obj)[0]
-    const val = Object.values(obj)[0]
-    return `${key} = ${int(val)}`
-}
+import {
+    buildInsertQuery,
+    buildSelectQuery,
+    buildUpdateQuery,
+    keyRaw,
+    keyRawObj,
+    keyStr,
+    keyStrObj,
+} from './globals'
 
 export const userQuery = (id?: string) => {
-    let query = 'SELECT * FROM users'
-    if (id) query += ` WHERE ${keyStr({ id })}`
-    return query
+    const where = id ? keyStr({ id }) : undefined
+    return buildSelectQuery('users', { where })
 }
 
 export const passwordResetQuery = (id: string, password: string) => {
-    return `
-        UPDATE users
-        SET
-            ${keyStr({ password })},
-            passwordReset = 0
-        WHERE ${keyStr({ id })}
-    `
+    const updates = [keyStr({ password }), keyRaw({ passworReset: 0 })]
+    return buildUpdateQuery('users', updates, keyStr({ id }))
 }
 
 export const createUserQuery = (id: string) => {
-    return `
-        INSERT INTO users (id, password, passwordReset)
-        VALUES (${str(id)}, UUID(), 1)
-    `
+    const values = [
+        keyStrObj({ id }),
+        keyRawObj({ password: 'UUID()' }),
+        keyRawObj({ passwordReset: 1 }),
+    ]
+    return buildInsertQuery('users', values)
 }
 
 export const sceneQuery = (select?: string[], where?: { id?: string; name?: string }) => {
-    const selectClause = 'SELECT ' + (select?.length > 0 ? select.join() : '*')
-    let query = selectClause + ' FROM scenes'
+    let whereString = undefined
     if (where) {
         const { id, name } = where
-        if (id || name) {
-            query += ' WHERE '
-            const idClause = id ? keyStr({ id }) : undefined
-            const nameClause = name ? keyStr({ name }) : undefined
-            const whereClause = [idClause, nameClause].filter((c) => c).join(' AND ')
-            query += whereClause
-        }
+        if (id) whereString = keyStr({ id })
+        else if (name) whereString = keyStr({ name })
     }
-    return query
+    return buildSelectQuery('scenes', { select, where: whereString })
 }
 
 export const createSceneQuery = (name: string, data: string) => {
-    return `
-        INSERT INTO scenes (name, data)
-        VALUES (${str(name)}, ${str(data)})
-    `
+    const values = [keyStrObj({ name }), keyStrObj({ data })]
+    return buildInsertQuery('scenes', values)
 }
 
 export const setCurrentSceneQuery = (sceneId: string, user: string) => {
-    return `
-        UPDATE users
-        SET ${keyInt({ sceneId })}
-        WHERE ${keyStr({ id: user })}
-    `
+    return buildUpdateQuery('users', [keyRaw({ sceneId })], keyStr({ id: user }))
 }
