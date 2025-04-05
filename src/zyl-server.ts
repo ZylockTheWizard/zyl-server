@@ -11,6 +11,7 @@ import {
     passwordResetQuery,
     sceneQuery,
     setCurrentSceneQuery,
+    updateSceneDataQuery,
     userQuery,
 } from './queries'
 import { areEqual, ServerDefault, SocketDefault } from './globals'
@@ -28,16 +29,8 @@ export class ZylServer {
     static socketDisconnect = (socket: SocketDefault) => {
         return () => {
             Logger.log('Client Disconnected: ' + socket.id)
-            socket.leave(this.zyleRoom)
             this.sockets = this.sockets.filter((s) => s.socket.id !== socket.id)
             this.broadcastCurrentUsers()
-        }
-    }
-
-    static socketQuery = (socket: SocketDefault) => {
-        return async (query: string, callback: (val: any) => void) => {
-            Logger.log('Client Query: ' + socket.id)
-            callback(await Database.query(query))
         }
     }
 
@@ -86,15 +79,10 @@ export class ZylServer {
                         await this.broadcastCurrentUsers()
                         userSocket.socket.join(this.zyleRoom)
                         const scenes = dbUser[0].master === 1 ? await this.currentScenes() : {}
-                        const currentScene = await Database.query(
-                            sceneQuery(['data'], dbUser[0].sceneId),
-                        )
-                        const currentSceneData =
-                            currentScene?.length > 0 ? currentScene[0].data : undefined
                         result = {
                             ...(await this.currentUsers()),
                             ...scenes,
-                            currentSceneData,
+                            sceneId: dbUser[0].sceneId,
                         }
                     }
                 }
@@ -153,20 +141,35 @@ export class ZylServer {
         return async (sceneId: string, user: string) => {
             await Database.query(setCurrentSceneQuery(sceneId, user))
             const result = await Database.query(sceneQuery(['data'], { id: sceneId }))
-            socket.emit('scene-data', result[0].data)
+            socket.emit('scene-data', sceneId, result[0].data)
+        }
+    }
+
+    static socketSceneUpdate = (socket: SocketDefault) => {
+        return async (sceneId: string, data: string) => {
+            await Database.query(updateSceneDataQuery(sceneId, data))
+            socket.to(this.zyleRoom).emit('scene-data', sceneId, data)
+        }
+    }
+
+    static socketGetScene = (socket: SocketDefault) => {
+        return async (sceneId: string) => {
+            const result = await Database.query(sceneQuery(['data'], { id: sceneId }))
+            socket.emit('scene-data', sceneId, result[0].data)
         }
     }
 
     static onConnection = (socket: SocketDefault) => {
         Logger.log('Client Connected: ' + socket.id)
         socket.on('disconnect', this.socketDisconnect(socket))
-        socket.on('query', this.socketQuery(socket))
         socket.on('login', this.socketLogin(socket))
         socket.on('password-reset', this.socketPasswordReset(socket))
         socket.on('logout', () => socket.disconnect())
         socket.on('user-save', this.socketUserSave(socket))
         socket.on('scene-save', this.socketSceneSave(socket))
         socket.on('set-current-scene', this.socketSetCurrentScene(socket))
+        socket.on('scene-update', this.socketSceneUpdate(socket))
+        socket.on('get-scene', this.socketGetScene(socket))
         this.sockets.push({ socket })
     }
 

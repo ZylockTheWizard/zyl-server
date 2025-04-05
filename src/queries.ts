@@ -14,7 +14,7 @@ export const userQuery = (id?: string) => {
 }
 
 export const passwordResetQuery = (id: string, password: string) => {
-    const updates = [keyStr({ password }), keyRaw({ passworReset: 0 })]
+    const updates = [keyStr({ password }), keyRaw({ passwordReset: 0 })]
     return buildUpdateQuery('users', updates, keyStr({ id }))
 }
 
@@ -44,4 +44,8 @@ export const createSceneQuery = (name: string, data: string) => {
 
 export const setCurrentSceneQuery = (sceneId: string, user: string) => {
     return buildUpdateQuery('users', [keyRaw({ sceneId })], keyStr({ id: user }))
+}
+
+export const updateSceneDataQuery = (id: string, data: string) => {
+    return buildUpdateQuery('scenes', [keyStr({ data })], keyStr({ id }))
 }

@@ -18,11 +18,9 @@ export class Database {
     }
 
     static query(q: string) {
-        Logger.log({ query: q })
         const resolveQuery = (resolve: (value: any) => void) => {
             const onComplete: mysql.queryCallback = (err, result) => {
                 if (err) throw err
-                Logger.log({ result })
                 resolve(result)
             }
             this.connection.query(q, onComplete)
