@@ -120,7 +120,7 @@ export class ZylServer {
         }
     }
 
-    static socketSceneSave = (_socket: SocketDefault) => {
+    static socketSceneCreate = (socket: SocketDefault) => {
         return async (name: string, data: string, callback: (val: any) => void) => {
             let error = ''
             let result = {}
@@ -130,18 +130,32 @@ export class ZylServer {
                 if (existingScene?.length > 0) error = 'Scene name already exists'
                 else {
                     await Database.query(createSceneQuery(name, data))
-                    result = await this.currentScenes()
+                    const scene = await Database.query(sceneQuery(['id', 'data'], { name }))
+                    if (!scene || scene.length === 0) error = 'Error creating scene'
+                    else {
+                        const sceneId = scene[0].id
+                        result = {
+                            ...(await this.currentScenes()),
+                            sceneId,
+                        }
+                        socket.emit('scene-data', sceneId, scene[0].data)
+                    }
                 }
             }
             callback({ result, error })
         }
     }
 
-    static socketSetCurrentScene = (socket: SocketDefault) => {
-        return async (sceneId: string, user: string) => {
+    static socketSetMyScene = (socket: SocketDefault) => {
+        return async (sceneId: string, user: string, callback: (val: any) => void) => {
             await Database.query(setCurrentSceneQuery(sceneId, user))
             const result = await Database.query(sceneQuery(['data'], { id: sceneId }))
             socket.emit('scene-data', sceneId, result[0].data)
+            const data = {
+                ...(await this.currentScenes()),
+                sceneId,
+            }
+            callback(data)
         }
     }
 
@@ -166,8 +180,8 @@ export class ZylServer {
         socket.on('password-reset', this.socketPasswordReset(socket))
         socket.on('logout', () => socket.disconnect())
         socket.on('user-save', this.socketUserSave(socket))
-        socket.on('scene-save', this.socketSceneSave(socket))
-        socket.on('set-current-scene', this.socketSetCurrentScene(socket))
+        socket.on('scene-create', this.socketSceneCreate(socket))
+        socket.on('set-my-scene', this.socketSetMyScene(socket))
         socket.on('scene-update', this.socketSceneUpdate(socket))
         socket.on('get-scene', this.socketGetScene(socket))
         this.sockets.push({ socket })
