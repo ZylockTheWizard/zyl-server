@@ -1,5 +1,6 @@
 import readline from 'node:readline'
 import { createServer } from 'node:http'
+import fs from 'node:fs'
 import express from 'express'
 import cors from 'cors'
 import { Server } from 'socket.io'
@@ -120,7 +121,7 @@ export class ZylServer {
         }
     }
 
-    static socketSceneCreate = (socket: SocketDefault) => {
+    static socketSceneCreate = (_socket: SocketDefault) => {
         return async (name: string, data: string, callback: (val: any) => void) => {
             let error = ''
             let result = {}
@@ -130,15 +131,10 @@ export class ZylServer {
                 if (existingScene?.length > 0) error = 'Scene name already exists'
                 else {
                     await Database.query(createSceneQuery(name, data))
-                    const scene = await Database.query(sceneQuery(['id', 'data'], { name }))
+                    const scene = await Database.query(sceneQuery(['id'], { name }))
                     if (!scene || scene.length === 0) error = 'Error creating scene'
                     else {
-                        const sceneId = scene[0].id
-                        result = {
-                            ...(await this.currentScenes()),
-                            sceneId,
-                        }
-                        socket.emit('scene-data', sceneId, scene[0].data)
+                        result = { sceneId: scene[0].id }
                     }
                 }
             }
@@ -173,6 +169,13 @@ export class ZylServer {
         }
     }
 
+    static socketGetMaps = (_socket: SocketDefault) => {
+        return async (callback: (val: any) => void) => {
+            const maps = fs.readdirSync('./images/maps/')
+            callback(maps)
+        }
+    }
+
     static onConnection = (socket: SocketDefault) => {
         Logger.log('Client Connected: ' + socket.id)
         socket.on('disconnect', this.socketDisconnect(socket))
@@ -184,6 +187,7 @@ export class ZylServer {
         socket.on('set-my-scene', this.socketSetMyScene(socket))
         socket.on('scene-update', this.socketSceneUpdate(socket))
         socket.on('get-scene', this.socketGetScene(socket))
+        socket.on('get-maps', this.socketGetMaps(socket))
         this.sockets.push({ socket })
     }
 
