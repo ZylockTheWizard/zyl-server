@@ -12,6 +12,7 @@ import {
     passwordResetQuery,
     sceneQuery,
     setCurrentSceneQuery,
+    tokenQuery,
     updateSceneDataQuery,
     userQuery,
 } from './queries'
@@ -80,9 +81,11 @@ export class ZylServer {
                         await this.broadcastCurrentUsers()
                         userSocket.socket.join(this.zyleRoom)
                         const scenes = dbUser[0].master === 1 ? await this.currentScenes() : {}
+                        const tokens = await Database.query(tokenQuery())
                         result = {
                             ...(await this.currentUsers()),
                             ...scenes,
+                            tokens,
                             sceneId: dbUser[0].sceneId,
                         }
                     }

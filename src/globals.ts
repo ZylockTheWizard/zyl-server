@@ -6,18 +6,33 @@ export type ServerDefault = Server<DefaultEventsMap, DefaultEventsMap, DefaultEv
 export const areEqual = (a: string | undefined, b: string | undefined) =>
     a?.toLowerCase() === b?.toLowerCase()
 
-export type QueryObject = {
-    [key: string]: string | number | boolean
-    string?: boolean
+export type RawString = {
+    val: string
 }
 
-const keyVal = (obj: QueryObject) => ({ key: Object.keys(obj)[0], val: Object.values(obj)[0] })
-const raw = (val: string | number | boolean) => (!val ? 'NULL' : val.toString())
-const str = (val: string | number | boolean) => (!val ? 'NULL' : `'${val}'`)
+export type QueryObject = {
+    [key: string]: RawString | string | number
+}
+
+const raw = (val: string | number) => (!val ? 'NULL' : val.toString())
+const str = (val: string | number) => (!val ? 'NULL' : `'${val}'`)
 
 const dbObject = (obj: QueryObject) => {
-    const { key, val } = keyVal(obj)
-    return { key, val: obj.string ? str(val) : raw(val) }
+    const key = Object.keys(obj)[0]
+    let val = Object.values(obj)[0]
+    switch (typeof val) {
+        case 'string':
+            val = str(val)
+            break
+        case 'object':
+            val = raw(val.val)
+            break
+        case 'number':
+            val = raw(val)
+            break
+    }
+
+    return { key, val }
 }
 
 const equalString = (obj: QueryObject) => {
